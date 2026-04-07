@@ -17,9 +17,10 @@ const io = new Server(server, {
 });
 
 // OpenClaw HTTP Client (connects to VPS)
+// NOTE: OpenClaw's default port is 18789, not 3001
 const spawnOpenClaw = async (prompt, context) => {
-  // IMPORTANT: Replace this with your actual VPS IP or domain
-  const VPS_OPENCLAW_URL = process.env.VPS_OPENCLAW_URL || 'http://YOUR_VPS_IP:3001';
+// IMPORTANT: Replace this with your actual VPS IP or domain
+  const VPS_OPENCLAW_URL = process.env.VPS_OPENCLAW_URL || 'http://YOUR_VPS_IP:18789';
   
   try {
     const response = await axios.post(
@@ -47,7 +48,7 @@ const spawnOpenClaw = async (prompt, context) => {
     console.error('[OpenClaw HTTP] Error:', error.message);
     // Provide helpful error message for user
     return {
-      reply: `I couldn't reach the OpenClaw agent on your VPS. Please check:\n\n1. OpenClaw is running on your VPS\n2. The VPS is accessible from this machine\n3. Port 3001 is open on your VPS firewall\n4. The VPS_OPENCLAW_URL environment variable is set correctly\n\nCurrent target: ${VPS_OPENCLAW_URL}\nError: ${error.message}`,
+      reply: `I couldn't reach the OpenClaw agent on your VPS. Please check:\n\n1. OpenClaw is running on your VPS\n2. The VPS is accessible from this machine\n3. Port 18789 is open on your VPS firewall (OpenClaw's default port)\n4. The VPS_OPENCLAW_URL environment variable is set correctly\n\nCurrent target: ${VPS_OPENCLAW_URL}\nError: ${error.message}`,
       codeEdits: [],
       terminalCommands: []
     };
@@ -104,7 +105,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 ClawIDE Server running on http://0.0.0.0:${PORT}`);
   console.log(`📌 Make sure to set VPS_OPENCLAW_URL environment variable`);
-  console.log(`📌 Example: export VPS_OPENCLAW_URL=http://your-vps-ip:3001`);
+  console.log(`📌 OpenClaw's default port is 18789: export VPS_OPENCLAW_URL=http://your-vps-ip:18789`);
 });
 
 // Graceful shutdown

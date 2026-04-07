@@ -64,10 +64,11 @@ npm run install-all
 npm install -g openclaw
 
 # 4. Configure VPS connection
+#    OpenClaw's DEFAULT PORT IS 18789 (not 3001!)
 #    Edit .env file or set environment variable:
-export VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:3001
+export VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:18789
 #    OR create a .env file in the root:
-#    VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:3001
+#    VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:18789
 
 # 5. Start the development servers
 npm run dev
@@ -83,13 +84,13 @@ The backend connects to your OpenClaw instance via HTTP. Configure using:
 
 **Environment Variable (Recommended):**
 ```bash
-export VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:3001
+export VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:18789
 ```
 
 **Or .env File:**
 Create a `.env` file in the project root:
 ```
-VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:3001
+VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:18789
 ```
 
 ### Security Notes
@@ -103,7 +104,7 @@ VPS_OPENCLAW_URL=http://your-vps-ip-or-domain:3001
 clawide/
 ├── client/          # React/Vite frontend with Monaco Editor
 │   ├── src/         # Source code (App.jsx, CmdKModal, etc.)
-│   ├── public/      # Static assets
+│   ├── public/      /* Static assets
 │   ├── package.json
 │   └── vite.config.js
 ├── server/          # Node.js/Express backend with Socket.io
@@ -111,14 +112,14 @@ clawide/
 │   └── package.json
 ├── electron/        # Electron desktop app foundation
 │   ├── main.js      # Main process with macOS menu
-│   ├── preload.js   # Secure renderer-main communication
-│   ├── assets/      # App icons
+│   ├── preload.js   /* Secure renderer-main communication
+│   ├── assets/      /* App icons
 │   └── package.json
-├── docs/            # Documentation
+├── docs/            /* Documentation
 │   └── PROJECT_TRACKER.md
-├── package.json     # Root package.json and scripts
-├── .gitignore       # Git ignore rules
-└── README.md        # This file
+├── package.json     /* Root package.json and scripts
+├── .gitignore       /* Git ignore rules
+└── README.md        /* This file
 ```
 
 ## 🛠️ Development Scripts
@@ -151,12 +152,12 @@ npm run dist   # Creates DMG/PKG installers
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `VPS_OPENCLAW_URL` | URL of your OpenClaw agent HTTP endpoint | `http://123.45.67.89:3001` |
+| `VPS_OPENCLAW_URL` | URL of your OpenClaw agent HTTP endpoint | `http://123.45.67.89:18789` |
 | `PORT` | Port for the ClawIDE backend server | `3000` (default) |
 
 ### Example Usage:
 ```bash
-export VPS_OPENCLAW_URL=http://192.168.1.100:3001
+export VPS_OPENCLAW_URL=http://162.62.226.231:18789
 export PORT=3000
 npm run dev
 ```
@@ -182,8 +183,8 @@ lsof -ti:3000 lsof -ti:5173 | xargs kill -9 2>/dev/null || true
 
 #### "Failed to connect to OpenClaw"
 1. Verify `VPS_OPENCLAW_URL` is set correctly
-2. Test from your machine: `curl -X POST http://your-vps-ip:3001/agent/run -d '{"prompt":"test"}'`
-3. Check VPS firewall allows access to port 3001
+2. Test from your machine: `curl -X POST http://your-vps-ip:18789/agent/run -d '{"prompt":"test"}'`
+3. Check VPS firewall allows access to port 18789
 4. Ensure OpenClaw is running and accessible on the VPS
 5. Check VPS OpenClaw logs for incoming requests
 
@@ -194,7 +195,7 @@ To run OpenClaw in HTTP mode on your VPS:
 openclaw agent run --help
 
 # If it supports HTTP:
-openclaw agent run --http --port 3001 --host 0.0.0.0
+openclaw agent run --http --port 18789 --host 0.0.0.0
 
 # If not, you may need to:
 # 1. Use SSH tunneling (see below)
@@ -205,19 +206,19 @@ openclaw agent run --http --port 3001 --host 0.0.0.0
 Instead of exposing OpenClaw directly:
 ```bash
 # On your development machine:
-ssh -L 3001:localhost:3001 your_vps_user@your_vps_ip
-# Keep this running - it forwards local port 3001 to VPS port 3001
+ssh -L 18789:localhost:18789 your_vps_user@your_vps_ip
+# Keep this running - it forwards local port 18789 to VPS port 18789
 
 # Then set:
-export VPS_OPENCLAW_URL=http://localhost:3001
-# Your backend will connect to localhost:3001, which goes through the tunnel to your VPS
+export VPS_OPENCLAW_URL=http://localhost:18789
+# Your backend will connect to localhost:18789, which goes through the tunnel to your VPS
 ```
 
 ## 📈 Roadmap
 
 ### ✅ Completed
 - Core web interface (React/Vite + Monaco Editor + Terminal)
-- Real OpenClaw integration (HTTP client to VPS)
+- Real OpenClaw integration (HTTP client to VPS, correct default port 18789)
 - Electron desktop app foundation
 - Comprehensive documentation
 
@@ -251,8 +252,8 @@ cd clawide
 npm run install-all
 npm install -g openclaw
 
-# Configure your VPS connection (skip if OpenClaw runs locally)
-export VPS_OPENCLAW_URL=http://your-vps-ip:3001
+# Configure your VPS connection (CRITICAL: Use port 18789, not 3001!)
+export VPS_OPENCLAW_URL=http://your-vps-ip:18789
 
 # Start developing!
 npm run dev
