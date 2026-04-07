@@ -1,21 +1,61 @@
 {
   "name": "clawide",
   "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "client",
-    "server",
-    "electron"
-  ],
+  "description": "ClawIDE - Custom IDE with OpenClaw agent integration",
+  "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
-    "build": "npm run build -w client && npm run build -w server",
-    "electron": "npm run start -w electron",
-    "electron-dev": "concurrently \"npm:web-dev\" \"npm:electron-dev\"",
-    "web-dev": "npm run dev -w client",
-    "electron-dev": "npm run start -w electron"
+    "dev": "concurrently \"npm:server-dev\" \"npm:client-dev\"",
+    "client-dev": "cd client && npm run dev",
+    "server-dev": "cd server && npm run dev",
+    "electron": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "dev.openclaw.clawide",
+    "productName": "ClawIDE",
+    "copyright": "Copyright © 2026 devpenclaw",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "electron/assets/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "client/**/*",
+      "server/**/*",
+      "electron/**/*",
+      "docs/**/*",
+      "!**/node_modules/*",
+      "!**/package-lock.json",
+      "!**/yarn.lock"
+    ]
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "socket.io": "^4.7.2",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.9.1",
     "concurrently": "^8.2.2"
   }
 }
