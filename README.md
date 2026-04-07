@@ -40,7 +40,7 @@ ClawIDE is a custom-built Integrated Development Environment designed to integra
 
 ```bash
 npm run dev
-```
+````
 
 This will start:
 - Frontend dev server on http://localhost:5173
