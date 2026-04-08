@@ -26,8 +26,9 @@ const io = new Server(server, {
 
 const VPS_URL = process.env.VPS_OPENCLAW_URL || 'http://localhost:18789';
 const TOKEN   = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+const HOOKS_TOKEN = process.env.OPENCLAW_HOOKS_TOKEN || TOKEN;
 
-const claw = new OpenClawClient({ url: VPS_URL, token: TOKEN });
+const claw = new OpenClawClient({ url: VPS_URL, token: TOKEN, hooksToken: HOOKS_TOKEN });
 
 claw.connect().then(() => {
   console.log('[OpenClaw] Connected to gateway at ' + VPS_URL);

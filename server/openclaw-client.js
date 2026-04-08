@@ -9,9 +9,10 @@ const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
 class OpenClawClient {
-  constructor({ url, token }) {
+  constructor({ url, token, hooksToken }) {
     this.url = url.replace(/^http/, 'ws'); // http → ws, https → wss
-    this.token = token;
+    this.token = token;           // operator token (WS auth)
+    this.hooksToken = hooksToken || token; // hooks token (HTTP auth) — separate from operator token
     this.ws = null;
     this.connected = false;
     this.pending = new Map();      // id → { resolve, reject, timeout }
@@ -344,10 +345,25 @@ class OpenClawClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + this.token
+          'X-OpenClaw-Token': this.hooksToken,
+          'Authorization': 'Bearer ' + this.hooksToken
         },
         body: JSON.stringify({ message })
       });
+
+      if (!res.ok) {
+        const body = await res.text();
+        this.agentRuns.delete(tempId);
+        this.onDelta = null;
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(
+            'Hooks auth failed (HTTP 401). The hooks token is separate from the operator token. ' +
+            'Set OPENCLAW_HOOKS_TOKEN in .env to the token under hooks.token in your openclaw.json on the VPS.'
+          );
+        }
+        throw new Error(`Gateway returned HTTP ${res.status}: ${body.slice(0, 200)}`);
+      }
+
       const data = await res.json();
 
       if (!data.ok || !data.runId) {
