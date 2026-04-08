@@ -61,8 +61,24 @@ io.on('connection', (socket) => {
 
   socket.on('fs-home', async (_data, cb) => {
     try {
-      const homePath = process.env.HOME || os.homedir() || '/tmp';
-      cb({ ok: true, path: homePath, name: path.basename(homePath) });
+      // Default to the project root (cwd of the server process), not $HOME
+      const projectRoot = path.resolve(__dirname, '..');
+      cb({ ok: true, path: projectRoot, name: path.basename(projectRoot) });
+    } catch (err) { cb({ ok: false, error: err.message }); }
+  });
+
+  socket.on('fs-cwd', async (_data, cb) => {
+    try {
+      const cwd = process.cwd();
+      cb({ ok: true, path: cwd, name: path.basename(cwd) });
+    } catch (err) { cb({ ok: false, error: err.message }); }
+  });
+
+  socket.on('fs-open-folder', async ({ folderPath }, cb) => {
+    try {
+      const resolved = path.resolve(folderPath);
+      await fs.access(resolved);
+      cb({ ok: true, path: resolved, name: path.basename(resolved) });
     } catch (err) { cb({ ok: false, error: err.message }); }
   });
 

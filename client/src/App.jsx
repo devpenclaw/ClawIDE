@@ -10,7 +10,7 @@ import {
   VscTerminal, VscClose, VscAdd, VscFile, VscFolder,
   VscFolderOpened, VscNewFile, VscNewFolder, VscRefresh,
   VscSend, VscChevronRight, VscChevronDown, VscChevronUp,
-  VscDebugStart, VscCopy, VscWand, VscMic, VscSplitHorizontal,
+  VscDebugStart, VscCopy, VscWand, VscMic,
 } from 'react-icons/vsc';
 import CmdKModal from './CmdKModal';
 import './App.css';
@@ -77,8 +77,9 @@ function App() {
   const [rootPath, setRootPath] = useState(null);
 
   // Terminal
-  const [terminalTabs] = useState([{ id: 1, name: 'zsh' }]);
-  const [activeTerminalTab] = useState(0);
+  const [terminalTabs, setTerminalTabs] = useState([{ id: 1, name: 'bash' }]);
+  const [activeTerminalTab, setActiveTerminalTab] = useState(0);
+  const termNextId = useRef(2);
 
   // Voice
   const [isRecording, setIsRecording] = useState(false);
@@ -91,6 +92,11 @@ function App() {
 
   // CmdK
   const [showCmdK, setShowCmdK] = useState(false);
+
+  // Inline dialogs (replacing browser prompt())
+  const [dialog, setDialog] = useState(null); // { type, title, placeholder, onConfirm }
+  const [dialogValue, setDialogValue] = useState('');
+  const dialogInputRef = useRef(null);
 
   // Refs
   const terminalRef = useRef(null);
@@ -138,37 +144,51 @@ function App() {
     });
   }, [activeTab]);
 
+  // Show inline dialog instead of browser prompt()
+  const showDialog = useCallback((title, placeholder, onConfirm) => {
+    setDialogValue('');
+    setDialog({ title, placeholder, onConfirm });
+    setTimeout(() => dialogInputRef.current?.focus(), 50);
+  }, []);
+
+  const confirmDialog = useCallback(() => {
+    if (!dialogValue.trim()) return;
+    dialog?.onConfirm(dialogValue.trim());
+    setDialog(null);
+    setDialogValue('');
+  }, [dialog, dialogValue]);
+
   const createNewFile = useCallback((dirPath) => {
-    const name = prompt('New file name:');
-    if (!name?.trim()) return;
-    socket.emit('fs-create-file', { dirPath, name: name.trim() }, (res) => {
-      if (res?.ok) { loadDirectory(dirPath); openFile(res.path, name.trim()); }
+    showDialog('New File', 'filename.js', (name) => {
+      socket.emit('fs-create-file', { dirPath, name }, (res) => {
+        if (res?.ok) { loadDirectory(dirPath); openFile(res.path, name); }
+      });
     });
-  }, [loadDirectory, openFile]);
+  }, [loadDirectory, openFile, showDialog]);
 
   const createNewFolder = useCallback((dirPath) => {
-    const name = prompt('New folder name:');
-    if (!name?.trim()) return;
-    socket.emit('fs-create-dir', { dirPath, name: name.trim() }, (res) => {
-      if (res?.ok) loadDirectory(dirPath);
+    showDialog('New Folder', 'folder-name', (name) => {
+      socket.emit('fs-create-dir', { dirPath, name }, (res) => {
+        if (res?.ok) loadDirectory(dirPath);
+      });
     });
-  }, [loadDirectory]);
+  }, [loadDirectory, showDialog]);
 
-  // Init workspace
+  // Init workspace — default to project root, not $HOME
   useEffect(() => {
     socket.emit('fs-home', {}, (res) => {
       if (res?.ok) {
         setRootPath(res.path);
         loadDirectory(res.path);
-        setWorkspaces([{ id: 1, name: res.name || 'Home', path: res.path }]);
+        setWorkspaces([{ id: 1, name: res.name || 'ClawIDE', path: res.path }]);
       }
     });
   }, [loadDirectory]);
 
   /* ═══ Terminal ═══ */
 
-  useEffect(() => {
-    if (!terminalRef.current || termRef.current) return;
+  const initTerminal = useCallback((el) => {
+    if (!el || termRef.current) return;
     const term = new Terminal({
       cursorBlink: true, cursorStyle: 'bar', fontSize: 13,
       fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
@@ -187,26 +207,41 @@ function App() {
     });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    term.open(terminalRef.current);
-    setTimeout(() => { try { fitAddon.fit(); } catch {} }, 100);
+    term.open(el);
+    // Wait for layout before fitting so dimensions are non-zero
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try { fitAddon.fit(); } catch {}
+        if (term.cols && term.rows) socket.emit('terminal-resize', { cols: term.cols, rows: term.rows });
+      }, 80);
+    });
     termRef.current = term;
     fitAddonRef.current = fitAddon;
+    terminalRef.current = el;
     term.onData((data) => socket.emit('terminal-input', { input: data }));
     socket.on('terminal-output', (data) => term.write(data.output));
     const ro = new ResizeObserver(() => {
       try { fitAddon.fit(); } catch {}
       if (term.cols && term.rows) socket.emit('terminal-resize', { cols: term.cols, rows: term.rows });
     });
-    ro.observe(terminalRef.current);
-    return () => { ro.disconnect(); socket.off('terminal-output'); };
+    ro.observe(el);
   }, []);
 
   // Refit terminal when shown
   useEffect(() => {
     if (showTerminal && fitAddonRef.current) {
-      setTimeout(() => { try { fitAddonRef.current.fit(); } catch {} }, 50);
+      requestAnimationFrame(() => { try { fitAddonRef.current.fit(); } catch {} });
     }
   }, [showTerminal]);
+
+  const addTerminalTab = () => {
+    const id = termNextId.current++;
+    setTerminalTabs(prev => [...prev, { id, name: `bash` }]);
+    setActiveTerminalTab(terminalTabs.length);
+    // Note: for a real multi-terminal, each would need its own xterm instance + server PTY
+    // For now, switching tabs refocuses the shared terminal
+    setTimeout(() => { try { termRef.current?.focus(); fitAddonRef.current?.fit(); } catch {} }, 100);
+  };
 
   /* ═══ Socket listeners ═══ */
 
@@ -308,30 +343,47 @@ function App() {
 
   /* ═══ Workspace ═══ */
   const addWorkspace = () => {
-    const name = prompt('Workspace name:');
-    if (!name) return;
-    const wsPath = prompt('Absolute path:');
-    if (!wsPath) return;
-    setWorkspaces(prev => [...prev, { id: Date.now(), name, path: wsPath }]);
-    setActiveWorkspace(workspaces.length);
-    setRootPath(wsPath);
-    loadDirectory(wsPath);
+    showDialog('Open Folder (absolute path)', '/path/to/project', (wsPath) => {
+      const name = wsPath.split('/').filter(Boolean).pop() || wsPath;
+      socket.emit('fs-open-folder', { folderPath: wsPath }, (res) => {
+        if (res?.ok) {
+          setWorkspaces(prev => [...prev, { id: Date.now(), name: res.name || name, path: res.path }]);
+          setActiveWorkspace(workspaces.length);
+          setRootPath(res.path);
+          setExpandedDirs(new Set());
+          loadDirectory(res.path);
+        }
+      });
+    });
   };
 
   const switchWorkspace = (i) => {
     setActiveWorkspace(i);
     setRootPath(workspaces[i].path);
+    setExpandedDirs(new Set());
     loadDirectory(workspaces[i].path);
   };
 
   /* ═══ Chat sessions ═══ */
   const newChatSession = () => {
     const id = Date.now();
-    setChatSessions(prev => [...prev, {
-      id, name: `Chat ${prev.length + 1}`,
-      messages: [{ role: 'agent', content: 'New conversation started. How can I help?' }],
-    }]);
-    setActiveChatSession(chatSessions.length);
+    setChatSessions(prev => {
+      const next = [...prev, {
+        id, name: `Chat ${prev.length + 1}`,
+        messages: [{ role: 'agent', content: 'New conversation started. How can I help?' }],
+      }];
+      setActiveChatSession(next.length - 1);
+      return next;
+    });
+  };
+
+  const deleteChatSession = (i) => {
+    if (chatSessions.length <= 1) return;
+    setChatSessions(prev => prev.filter((_, idx) => idx !== i));
+    setActiveChatSession(prev => {
+      if (prev >= i && prev > 0) return prev - 1;
+      return prev;
+    });
   };
 
   const statusText = () => {
@@ -564,23 +616,29 @@ function App() {
             />
           </div>
 
-          {/* Terminal (always mounted, conditionally visible) */}
+          {/* Terminal — always in DOM so xterm keeps its state */}
           <div className={`term-section${showTerminal ? '' : ' collapsed'}`}>
             <div className="term-hdr">
               <div className="term-tabs">
                 {terminalTabs.map((t, i) => (
-                  <button key={t.id} className={`term-tab${i === activeTerminalTab ? ' active' : ''}`}>
+                  <button
+                    key={t.id}
+                    className={`term-tab${i === activeTerminalTab ? ' active' : ''}`}
+                    onClick={() => { setActiveTerminalTab(i); setTimeout(() => { try { termRef.current?.focus(); fitAddonRef.current?.fit(); } catch {} }, 50); }}
+                  >
                     <VscTerminal size={12} /> {t.name}
+                    {terminalTabs.length > 1 && (
+                      <span className="term-tab-x" onClick={(e) => { e.stopPropagation(); setTerminalTabs(p => p.filter((_, idx) => idx !== i)); if (activeTerminalTab >= i && activeTerminalTab > 0) setActiveTerminalTab(p => p - 1); }}><VscClose size={10} /></span>
+                    )}
                   </button>
                 ))}
-                <button className="term-tab term-add" title="New Terminal"><VscAdd size={12} /></button>
+                <button className="term-tab term-add" title="New Terminal" onClick={addTerminalTab}><VscAdd size={12} /></button>
               </div>
               <div className="term-actions">
-                <button className="i-btn" title="Split"><VscSplitHorizontal size={14} /></button>
-                <button className="i-btn" onClick={() => setShowTerminal(false)} title="Close"><VscClose size={14} /></button>
+                <button className="i-btn" onClick={() => setShowTerminal(false)} title="Close Terminal"><VscClose size={14} /></button>
               </div>
             </div>
-            <div className="term-body" ref={terminalRef} />
+            <div className="term-body" ref={initTerminal} />
           </div>
 
           {/* Terminal toggle bar */}
@@ -608,9 +666,10 @@ function App() {
             {chatSessions.length > 1 && (
               <div className="chat-sessions">
                 {chatSessions.map((s, i) => (
-                  <button key={s.id} className={`cs-tab${i === activeChatSession ? ' active' : ''}`} onClick={() => setActiveChatSession(i)}>
-                    {s.name}
-                  </button>
+                  <div key={s.id} className={`cs-tab${i === activeChatSession ? ' active' : ''}`}>
+                    <button className="cs-tab-name" onClick={() => setActiveChatSession(i)}>{s.name}</button>
+                    <button className="cs-tab-del" onClick={() => deleteChatSession(i)} title="Delete chat"><VscClose size={10} /></button>
+                  </div>
                 ))}
               </div>
             )}
@@ -767,6 +826,36 @@ function App() {
           onSuggestionSubmit={(edits) => { if (edits?.[0]?.newText) updateCode(edits[0].newText); setShowCmdK(false); }}
           agentStatus={agentStatus}
         />
+      )}
+
+      {/* ─── Inline Dialog ─── */}
+      {dialog && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setDialog(null)}>
+          <div className="inline-dialog">
+            <div className="dialog-hdr">
+              <span className="dialog-title">{dialog.title}</span>
+              <button className="i-btn" onClick={() => setDialog(null)}><VscClose size={16} /></button>
+            </div>
+            <div className="dialog-body">
+              <input
+                ref={dialogInputRef}
+                className="dialog-input"
+                value={dialogValue}
+                onChange={(e) => setDialogValue(e.target.value)}
+                placeholder={dialog.placeholder}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') confirmDialog();
+                  if (e.key === 'Escape') setDialog(null);
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="dialog-foot">
+              <button className="cmdk-btn" onClick={() => setDialog(null)}>Cancel</button>
+              <button className="cmdk-btn primary" onClick={confirmDialog} disabled={!dialogValue.trim()}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
